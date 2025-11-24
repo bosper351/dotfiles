@@ -1,0 +1,62 @@
+# Configuration
+set linenumbers
+set autoindent
+set mouse           # double-click to start selection, click to end
+set nonewlines      # no auto new line at the end of file
+set tabsize 4
+set multibuffer     # multi-file editing
+set zap             # Backspace deletes selection instead of one character
+set minibar         # Remove titlebar
+set numbercolor grey,normal
+set constantshow	# Show the cursor position
+set softwrap		# soft-wrap long lines ...
+set atblanks		# ... only at whitespaces instead of in the middle of the word
+
+# Keybindings
+bind ^Q	exit all
+bind ^S writeout main
+bind ^F whereis	all
+bind ^G findnext all
+bind M-G findprevious all
+bind ^R replace main
+bind ^Z undo main
+bind M-Z redo main
+bind ^C copy main
+bind ^X cut main
+bind ^V paste all
+bind M-/ comment main
+bind ^L gotoline main
+bind ^O insert main
+bind M-] indent main
+bind M-[ unindent main
+unbind M-{ main
+bind M-} findbracket main
+bind Sh-M-R refresh all
+
+# Navigation shortcuts
+# They are in line with Mac Terminal.app, which is sending
+# specific key sequences when pressing Option-x keys.
+# E.g. M-F is send by the terminal when Option-Right is pressed.
+bind M-F nextword main			# Terminal Option-Right
+bind M-B prevword main			# Terminal Option-Left
+bind M-H chopwordleft main		# Terminal Option-Delete (backstape)
+bind M-( chopwordright main		# Terminal Option-Fn-Delete
+
+# VSCode terminal
+bind ^W chopwordleft main		# VScode terminal Opt-Backspace
+
+bind M-D chopwordright main		# readline-compliant
+
+bind ^K "{mark}{end}{zap}" main	# Delete from cursor to the end of line
+
+# Copy to Mac clipboard. {exit} is required with multibuffers
+bind M-C "{execute}| pbcopy{enter}{undo}{exit}" main
+
+# Quick ref:
+# M-7, M-8 - move to prev/next text section
+# ^K delete from cursor to the end of the line
+# ^M - insert new line after cursor
+
+# Syntax highlighting
+include "/opt/homebrew/share/nano/*.nanorc"
+include "~/.config/nano/git.nanorc"

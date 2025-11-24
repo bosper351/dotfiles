@@ -1,0 +1,12 @@
+[general]
+import = ["~/.config/alacritty/themes/one_dark.toml"]
+
+[window]
+decorations_theme_variant = "Dark"
+
+[font]
+normal = {family = "SF Mono"}
+size = 13
+
+[cursor]
+style = {blinking = "On"}
