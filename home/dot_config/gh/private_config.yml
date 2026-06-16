@@ -1,0 +1,6 @@
+version: "1"
+git_protocol: https
+aliases:
+    approve: pr review --approve
+    atlantis: pr comment --body "atlantis $1"
+    web: pr view --web

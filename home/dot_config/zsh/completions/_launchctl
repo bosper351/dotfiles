@@ -1,0 +1,495 @@
+#compdef launchctl
+
+# Credits:
+# - Camden Narzt (2016-2025), MIT license (https://github.com/CamJN/launchctl-completion)
+# - Andrea Alberti (2026), MIT license (https://github.com/alberti42/zsh-misc-completions)
+
+# TODO:
+  #  Several launchctl arguments have no known programmatic way to enumerate:
+  #  audit session IDs (asids), XPC tokens, XPC service names, and Mach port names.
+  #  Find a way to list these so they can be completed.
+
+__launchctl_paths() {
+    local -a files
+    # -N: nullglob (no error if no match), .: regular files only
+    files=( /Library/Launch*/*(-N.) ~/Library/Launch*/*(-N.) )
+    print -l "${files[@]/#${HOME}/~}"
+}
+
+__launchctl_list_pids() {
+    command ps axo pid= | tr -d ' ' | sort -n
+}
+
+__launchctl_list_uids() {
+    # Only include UIDs >= 500; macOS reserves 0-499 for system service accounts.
+    dscl . -list /Users UniqueID 2>/dev/null | awk '$2 >= 500 {print $2}' | sort -n
+}
+
+__launchctl_list_domain_targets() {
+    case "${1[1]}" in
+        s) print system ;;
+        p) __launchctl_list_pids | while IFS= read -r pid; do print "pid/${pid}"; done ;;
+        g) __launchctl_list_uids | while IFS= read -r uid; do print "gui/${uid}"; done ;;
+        l) ;; # audit session IDs unavailable
+        u) __launchctl_list_uids | while IFS= read -r uid; do print "user/${uid}"; done ;;
+    esac
+}
+
+__launchctl_list_labels() {
+    # Use tab as delimiter: labels may contain spaces (e.g. "Warning for low battery…").
+    launchctl list 2>/dev/null | awk -F'\t' 'NR>1 {print $3}' | \
+        grep -vE '0x[0-9a-fA-F]+\.(anonymous|mach_init)'
+}
+
+__launchctl_list_started() {
+    launchctl list 2>/dev/null | awk -F'\t' 'NR>1 && $1 != "-" {print $3}' | \
+        grep -vE '0x[0-9a-fA-F]+\.(anonymous|mach_init)'
+}
+
+__launchctl_list_stopped() {
+    launchctl list 2>/dev/null | awk -F'\t' 'NR>1 && $1 == "-" {print $3}' | \
+        grep -vE '0x[0-9a-fA-F]+\.(anonymous|mach_init)'
+}
+
+__launchctl_list_envvars() {
+    printenv | cut -d= -f1 | sort -u
+}
+
+# Progressive domain/uid/service target completion.
+# $1 = filter: started | stopped | all | domain
+# "domain" completes only up to the domain-target level (no service name).
+__launchctl_complete_service_target() {
+    local filter=${1:-all}
+    local cur="${PREFIX}${SUFFIX}"
+    local slash_count=${#${cur//[^\/]/}}
+    local -a items
+
+    if (( slash_count == 0 )); then
+        compadd -S '/' -r '/' -- system gui user pid login
+
+    elif (( slash_count == 1 )); then
+        local domain="${cur%%/*}"
+        case $domain in
+            system)
+                # system is a complete domain target on its own; go straight to services
+                if [[ $filter != domain ]]; then
+                    compset -P 'system/'
+                    items=( ${(f)"$(__launchctl_list_labels)"} )
+                    compadd -a items
+                fi
+                ;;
+            gui|user)
+                compset -P "${domain}/"
+                items=( ${(f)"$(__launchctl_list_uids)"} )
+                if [[ $filter == domain ]]; then
+                    compadd -a items
+                else
+                    compadd -S '/' -r '/' -a items
+                fi
+                ;;
+            pid)
+                compset -P 'pid/'
+                items=( ${(f)"$(__launchctl_list_pids)"} )
+                if [[ $filter == domain ]]; then
+                    compadd -a items
+                else
+                    compadd -S '/' -r '/' -a items
+                fi
+                ;;
+            login)
+                compset -P 'login/'
+                # audit session IDs unavailable
+                ;;
+        esac
+
+    else
+        [[ $filter == domain ]] && return
+        compset -P '*/'
+        case $filter in
+            started) items=( ${(f)"$(__launchctl_list_started)"} ) ;;
+            stopped) items=( ${(f)"$(__launchctl_list_stopped)"} ) ;;
+            *)       items=( ${(f)"$(__launchctl_list_labels)"} ) ;;
+        esac
+        compadd -a items
+    fi
+}
+
+# Plist file paths with tilde substitution, plus parent dirs as shortcuts.
+# Used by bootout, bootstrap, load, unload.
+__launchctl_complete_plist_paths() {
+    local -a files
+    files=( ${(f)"$(__launchctl_paths)"} )
+    compadd -f -- "${files[@]}"
+    local -a top_dirs
+    top_dirs=( ${(u)files:h:h} )
+    compadd -f -S '/' -r '/' -- "${top_dirs[@]}"
+}
+
+# --- Subcommand handlers ---
+
+__launchctl_complete_asuser() {
+    # asuser UID command [args]
+    if (( CURRENT == 2 )); then
+        local -a uids
+        uids=( ${(f)"$(__launchctl_list_uids)"} )
+        compadd -a uids
+    else
+        # CURRENT > 2: the UID has been given and we are now completing the command
+        # name or one of its arguments. Strip the subcommand + UID so that _normal
+        # sees a plain "command [args]" context and recurses into that command's own
+        # completion (the same technique used by the sudo completion).
+        shift 2 words
+        (( CURRENT -= 2 ))
+        _normal
+    fi
+}
+
+__launchctl_complete_attach() {
+    # attach [-ksx] service-target
+    local state
+    _arguments -s -S \
+        '(-k)-k[kill service before attaching]' \
+        '(-s)-s[stop at first instruction]' \
+        '(-x)-x[do not print connection info]' \
+        ':service-target:->st'
+    case $state in
+        st) __launchctl_complete_service_target started ;;
+    esac
+}
+
+__launchctl_complete_bootout() {
+    # bootout domain-target [service-path ...] | service-target
+    if (( CURRENT == 2 )); then
+        __launchctl_complete_service_target started
+    else
+        __launchctl_complete_plist_paths
+    fi
+}
+
+__launchctl_complete_bootstrap() {
+    # bootstrap domain-target [service-path ...] | service-target
+    if (( CURRENT == 2 )); then
+        __launchctl_complete_service_target stopped
+    else
+        __launchctl_complete_plist_paths
+    fi
+}
+
+__launchctl_complete_bsexec() {
+    # bsexec PID command [args]
+    if (( CURRENT == 2 )); then
+        local -a pids
+        pids=( ${(f)"$(__launchctl_list_pids)"} )
+        compadd -a pids
+    else
+        # CURRENT > 2: the PID has been given and we are now completing the command
+        # name or one of its arguments. Strip the subcommand + PID so that _normal
+        # sees a plain "command [args]" context and recurses into that command's own
+        # completion (the same technique used by the sudo completion).
+        shift 2 words
+        (( CURRENT -= 2 ))
+        _normal
+    fi
+}
+
+__launchctl_complete_config() {
+    # config system|user umask|path value
+    case $CURRENT in
+        2) compadd system user ;;
+        3) compadd umask path ;;
+        4)
+            case $words[3] in
+                umask)
+                    local -a umasks
+                    umasks=( {0..7}{0..7}{0..7} )
+                    compadd -a umasks
+                    ;;
+                path) _files ;;
+            esac
+            ;;
+    esac
+}
+
+__launchctl_complete_debug() {
+    # debug service-target [--program <path>] [--guard-malloc] [...] [--] [argv0 ...]
+    local -a all_flags
+    all_flags=(
+        --program --guard-malloc --malloc-stack-logging --malloc-nano-allocator
+        --start-suspended --debug-libraries --introspection-libraries
+        --NSZombie --32 --stdin --stdout --stderr --environment --
+    )
+
+    local double_dash_idx=$words[(I)--]
+    if (( double_dash_idx && CURRENT > double_dash_idx )); then
+        # Past the -- separator: complete the argv0 command and its arguments by
+        # stripping everything up to and including -- and delegating to _normal,
+        # which recurses into that command's own completion (sudo technique).
+        shift $double_dash_idx words
+        (( CURRENT -= double_dash_idx ))
+        _normal
+        return
+    fi
+
+    if (( CURRENT == 2 )); then
+        __launchctl_complete_service_target all
+        return
+    fi
+
+    case $words[CURRENT-1] in
+        --program)
+            _command_names -e
+            return
+            ;;
+        --stdin|--stdout|--stderr)
+            _files
+            return
+            ;;
+        --environment)
+            # KEY=value pairs; hard to complete
+            return
+            ;;
+    esac
+
+    # Offer remaining unused flags
+    local -a remaining
+    local f
+    for f in "${all_flags[@]}"; do
+        if (( ! $words[(I)$f] )); then
+            remaining+=( "$f" )
+        fi
+    done
+    compadd -a remaining
+}
+
+__launchctl_complete_error() {
+    # error [posix|mach|bootstrap] code
+    case $CURRENT in
+        2) compadd posix mach bootstrap ;;
+        *)
+            case $words[2] in
+                bootstrap) compadd {0..56} {1000..1003} {1100..1105} {1601..1607} ;;
+                mach)      compadd {1..56} ;;
+                posix)     compadd {0..164} ;;
+            esac
+            ;;
+    esac
+}
+
+__launchctl_complete_kickstart() {
+    # kickstart [-k] [-p] <service-target>
+    local state
+    _arguments -s -S \
+        '(-k)-k[kill service if already running]' \
+        '(-p)-p[print PID of service after start]' \
+        ':service-target:->st'
+    case $state in
+        st) __launchctl_complete_service_target all ;;
+    esac
+}
+
+__launchctl_complete_kill() {
+    # kill <signal-number|signal-name> <service-target>
+    if (( CURRENT == 2 )); then
+        _signals
+        compadd {1..31}
+    else
+        __launchctl_complete_service_target started
+    fi
+}
+
+__launchctl_complete_limit() {
+    # limit [<limit-name> [<both-limits> | <soft-limit> <hard-limit>]]
+    case $CURRENT in
+        2) compadd cpu filesize data stack core rss memlock maxproc maxfiles ;;
+        *) compadd unlimited ;;
+    esac
+}
+
+__launchctl_complete_load_unload() {
+    # load|unload [-wF] [-S sessiontype] [-D searchpath] paths...
+    local state
+    _arguments -s -S \
+        '(-w)-w[mark service to be loaded on next boot]' \
+        '(-F)-F[force loading/unloading]' \
+        '-S+[specify session type]:session type:(Aqua Background LoginWindow StandardIO System)' \
+        '-D+[specify search path]:search path:(system local network user)' \
+        '*:plist file:->plist'
+    case $state in
+        plist) __launchctl_complete_plist_paths ;;
+    esac
+}
+
+__launchctl_complete_plist() {
+    # Completes arguments for: launchctl plist [segment,section] <Mach-O-binary>
+    #
+    # Background:
+    #   Some macOS daemons/agents embed their launchd configuration directly
+    #   inside the Mach-O binary instead of shipping a separate .plist file.
+    #   The data lives in a named segment+section of the binary.
+    #
+    #   A Mach-O binary is organized as:
+    #     segment (__TEXT) -> section (__launchd_plist)
+    #
+    #   The [segment,section] argument is a single token (comma-separated)
+    #   telling launchctl *where* inside the binary to look. Example:
+    #     launchctl plist __TEXT,__launchd_plist /usr/libexec/some-daemon
+    #
+    #   By convention, launchd plists are ALWAYS embedded in __TEXT,__launchd_plist.
+    #   No other segment/section is used for this purpose in practice, so we
+    #   hardcode this single value rather than scanning binaries at completion time.
+    #
+    #   The [segment,section] argument is optional: if omitted, launchctl defaults
+    #   to __TEXT,__launchd_plist automatically. So at position 2 the user may
+    #   type either the segment,section token OR go straight to the binary path.
+    #   launchctl tells them apart unambiguously: a segment,section token always
+    #   contains a comma, while a file path never does.
+    if (( CURRENT == 2 )); then
+        compadd -- '__TEXT,__launchd_plist'
+        _files
+    else
+        _files
+    fi
+}
+
+__launchctl_complete_submit() {
+    # submit -l label [-p executable] [-o stdout-path] [-e stderr-path] -- command [args]
+    local double_dash_idx=$words[(I)--]
+    if (( double_dash_idx && CURRENT > double_dash_idx )); then
+        # Past the -- separator: complete the command and its arguments by
+        # stripping everything up to and including -- and delegating to _normal,
+        # which recurses into that command's own completion (sudo technique).
+        shift $double_dash_idx words
+        (( CURRENT -= double_dash_idx ))
+        _normal
+        return
+    fi
+
+    local -a args
+    args=(
+        '-l+[specify job label]:label'
+        '-o+[specify stdout path]:file:_files'
+        '-e+[specify stderr path]:file:_files'
+    )
+    # Only offer -p and -- once -l is present
+    if (( $words[(I)-l] )); then
+        args+=( '-p+[specify executable]:executable:_command_names -e' )
+        args+=( '(- :)--[end of flags]' )
+    fi
+    _arguments -s -S "${args[@]}"
+}
+
+# --- Main completion function ---
+
+_launchctl() {
+    local curcontext="$curcontext" state line
+    local -a subcommands
+    subcommands=(
+        'asuser:execute a command in the given user'\''s context'
+        'attach:attach the system debugger to a service'
+        'blame:print the reason a service is running'
+        'bootout:cancel service loading or unload a service'
+        'bootstrap:bootstrap a service into a domain'
+        'bootshell:bring the system up in bootstrap context'
+        'bsexec:execute a command in the given bootstrap context'
+        'config:configure a parameter of launchd'
+        'debug:reconfigure a service for debugging'
+        'disable:disable a service'
+        'dump-xsc:dump an XPC service'\''s state'
+        'dumpjpcategory:dump the JPC category for all services'
+        'dumpstate:dump launchd state to standard output'
+        'enable:enable a service'
+        'error:print a description of a given error code'
+        'examine:run a tool against launchd'\''s internals'
+        'getenv:print a launchd environmental variable'
+        'help:get help on how to use launchctl'
+        'hostinfo:print a summary of host information'
+        'kickstart:force a service to start immediately'
+        'kill:send a signal to a service'
+        'limit:view and adjust resource limits'
+        'list:list services and their properties'
+        'load:load a service (deprecated, prefer bootstrap)'
+        'managername:print the name of the current launchd session'
+        'managerpid:print the PID of the current launchd session'\''s manager'
+        'manageruid:print the UID of the current launchd session'\''s manager'
+        'plist:print a property list embedded in a Mach-O binary'
+        'print:print a description of a domain or service'
+        'print-cache:print the launchd job cache'
+        'print-disabled:print the list of disabled services'
+        'print-token:print a security token'
+        'procinfo:print port information about a process'
+        'reboot:reboot the machine'
+        'remove:remove a job from launchd'
+        'resolveport:resolve a port name from a process'
+        'setenv:set a launchd environmental variable'
+        'start:start a service'
+        'stop:stop a service'
+        'submit:submit a basic job to launchd'
+        'unload:unload a service (deprecated, prefer bootout)'
+        'unsetenv:unset a launchd environmental variable'
+        'variant:print the launchd variant'
+        'version:print the launchd version'
+    )
+
+    _arguments -C \
+        '1:subcommand:->subcommand' \
+        '*::args:->args'
+
+    case $state in
+        subcommand)
+            _describe 'launchctl subcommand' subcommands
+            ;;
+        args)
+            curcontext="${curcontext%:*}-${words[1]}:"
+            case $words[1] in
+                asuser)         __launchctl_complete_asuser ;;
+                attach)         __launchctl_complete_attach ;;
+                blame)          __launchctl_complete_service_target started ;;
+                bootout)        __launchctl_complete_bootout ;;
+                bootstrap)      __launchctl_complete_bootstrap ;;
+                bootshell)      compadd continue ;;
+                bsexec)         __launchctl_complete_bsexec ;;
+                config)         __launchctl_complete_config ;;
+                debug)          __launchctl_complete_debug ;;
+                disable)        __launchctl_complete_service_target started ;;
+                dump-xsc)       ;;
+                dumpjpcategory) ;;
+                dumpstate)      ;;
+                enable)         __launchctl_complete_service_target stopped ;;
+                error)          __launchctl_complete_error ;;
+                examine)        _alternative \
+                                    'commands:command:_command_names -e' \
+                                    'special:special:((\\@PID))' ;;
+                getenv)         local -a ev; ev=( ${(f)"$(__launchctl_list_envvars)"} ); compadd -a ev ;;
+                help)           _describe 'launchctl subcommand' subcommands ;;
+                hostinfo)       ;;
+                kickstart)      __launchctl_complete_kickstart ;;
+                kill)           __launchctl_complete_kill ;;
+                limit)          __launchctl_complete_limit ;;
+                list)           local -a lb; lb=( ${(f)"$(__launchctl_list_labels)"} ); compadd -a lb ;;
+                load)           __launchctl_complete_load_unload ;;
+                managername)    ;;
+                managerpid)     ;;
+                manageruid)     ;;
+                plist)          __launchctl_complete_plist ;;
+                print)          __launchctl_complete_service_target all ;;
+                print-cache)    ;;
+                print-disabled) __launchctl_complete_service_target domain ;;
+                print-token)    ;;
+                procinfo)       local -a pids; pids=( ${(f)"$(__launchctl_list_pids)"} ); compadd -a pids ;;
+                reboot)         compadd system halt userspace logout apps ;;
+                remove)         local -a lb; lb=( ${(f)"$(__launchctl_list_labels)"} ); compadd -a lb ;;
+                resolveport)    local -a pids; pids=( ${(f)"$(__launchctl_list_pids)"} ); compadd -a pids ;;
+                setenv)         ;;
+                start)          local -a lb; lb=( ${(f)"$(__launchctl_list_labels)"} ); compadd -a lb ;;
+                stop)           local -a lb; lb=( ${(f)"$(__launchctl_list_labels)"} ); compadd -a lb ;;
+                submit)         __launchctl_complete_submit ;;
+                unload)         __launchctl_complete_load_unload ;;
+                unsetenv)       local -a ev; ev=( ${(f)"$(__launchctl_list_envvars)"} ); compadd -a ev ;;
+                variant)        ;;
+                version)        ;;
+            esac
+            ;;
+    esac
+}
+
+_launchctl "$@"

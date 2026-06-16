@@ -1,0 +1,47 @@
+[user]
+	name = Mieszko Boczkowski
+	# Do not guess identity
+	useConfigOnly = true
+[credential "https://github.com"]
+	helper =
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[color]
+	ui = auto
+[column]
+	ui = auto
+[branch]
+	sort = -committerdate
+[tag]
+	sort = version:refname
+[init]
+	defaultBranch = main
+[fetch]
+	prune = true
+	pruneTags = true
+	all = true
+[pull]
+	rebase = true
+[push]
+	autoSetupRemote = true
+[rebase]
+	autoSquash = true
+	autoStash = true
+	updateRefs = true
+[alias]
+	cand = commit --all --no-edit --amend
+	fixup = "! git commit --fixup $(git log -n 1 --format="%h" --invert-grep --grep='^fixup! ')"
+	pf = push --force-with-lease --force-if-includes
+	st = status
+	sw = switch
+	new = "!f() { \
+	    [[ $# -eq 1 ]] || { echo 'Usage: git new <branch-name>'; exit 1; }; \
+	    default=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD | cut -c8-); \
+	    git switch \"$default\" && \
+	    git pull --ff-only && \
+	    git switch -c $1; \
+	    }; f"
+[include]
+	path = config.local

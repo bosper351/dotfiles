@@ -1,0 +1,27 @@
+# -*- mode: gitignore; -*-
+
+# usual temp files
+temp
+tmp
+.temp
+.tmp
+
+# mise
+mise.toml
+
+# intelij
+.idea
+
+# mac
+.DS_Store
+
+# Emacs temps and backups
+*~
+\#*\#
+.\#*
+
+# Claude code settings
+**/.claude/settings.local.json
+
+# Agent-shell
+/.agent-shell/

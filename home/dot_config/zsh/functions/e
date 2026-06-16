@@ -1,0 +1,24 @@
+#!/bin/zsh
+
+emulate -L zsh
+setopt local_options
+
+if (( $# != 1 )); then
+    print -ru2 "Usage: e FILE | e -"
+    return 1
+fi
+
+
+if [[ "$1" == "-" ]]; then
+    local tmpf=$(mktemp -t emacs-stdin.XXXXXXXX)
+    > "$tmpf"
+    trap 'rm -f "$tmpf"' EXIT
+    emacsclient -n --eval "(progn (let ((dir default-directory)) (find-file \"$tmpf\") (setq default-directory dir) (set-visited-file-name nil) (rename-buffer \"*stdin*\" t)))"
+    return
+fi
+
+if [[ $INSIDE_EMACS == "ghostel" ]]; then
+    ghostel_cmd find-file "$1"
+else
+    emacsclient -n "$1"
+fi

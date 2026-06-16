@@ -1,0 +1,5 @@
+#!/bin/zsh
+
+brew upgrade
+mise upgrade
+chezmoi update --refresh-externals

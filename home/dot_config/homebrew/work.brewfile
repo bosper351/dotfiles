@@ -1,0 +1,17 @@
+tap "hashicorp/tap", trusted: true
+
+brew "awscli"
+brew "box/box/boxconnect"
+brew "box/box/skynet-tools"
+brew "caddy"
+brew "duckdb"
+brew "git-lfs"
+brew "hashicorp/tap/vault"
+brew "jira-cli"
+brew "libomp" # xgboost dep
+brew "pre-commit"
+
+cask "1password"
+cask "betterdisplay"
+cask "box-tools"
+cask "claude-code"

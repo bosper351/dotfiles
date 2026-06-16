@@ -1,0 +1,8 @@
+.config/fish/fish_variables
+**/.DS_Store
+.config/git/*.local
+
+{{/* Selectively ignore some files per machine */}}
+{{- $work := hasPrefix "mbp-" .chezmoi.hostname -}}
+
+.config/homebrew/{{ if not $work }}work{{ else }}private{{ end }}.brewfile

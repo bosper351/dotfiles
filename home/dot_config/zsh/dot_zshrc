@@ -1,0 +1,63 @@
+#!/bin/zsh
+
+
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.config/zsh/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+# Zephyr plugins
+zstyle ':zephyr:plugin:*' use-xdg-basedirs yes
+zstyle ':zephyr:plugin:*' use-cache no
+zstyle ':zephyr:plugin:editor' key-bindings emacs
+zstyle ':zephyr:plugin:editor:*' cursor block
+zstyle ':zephyr:plugin:editor' prepend-sudo no
+
+zephyr_plugins=(
+    zfunctions
+    utility
+    environment
+    homebrew
+    color
+    completion
+    compstyle
+    directory
+    editor
+    history
+    macos
+)
+zstyle ':zephyr:load' plugins $zephyr_plugins
+
+source ~/.local/share/zsh-plugins/zephyr/zephyr.zsh
+
+# Brew plugins
+source /opt/homebrew/opt/zsh-fast-syntax-highlighting/share/zsh-fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
+
+# zsh-autosuggestions
+source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# zsh-completions
+fpath+=(/opt/homebrew/share/zsh-completions)
+
+# hsmw
+zstyle ":history-search-multi-word" highlight-color ""
+zstyle ":plugin:history-search-multi-word" active "standout,fg=15"
+source ~/.local/share/zsh-plugins/history-search-multi-word/history-search-multi-word.plugin.zsh
+
+# needs to be enabled after zsh-syntax-highlighting
+source /opt/homebrew/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+bindkey-hss
+
+# Edit command with EDITOR (alt-e)
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^[e' edit-command-line
+
+source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
+# To customize prompt, run `p10k configure` or edit ~/.config/zsh/.p10k.zsh.
+[[ ! -f ~/.config/zsh/.p10k.zsh ]] || source ~/.config/zsh/.p10k.zsh
+
+# Local settings
+[[ ! -f ${ZDOTDIR}/.zshrc.local ]] || source ${ZDOTDIR}/.zshrc.local

@@ -1,0 +1,31 @@
+#!/bin/zsh
+#
+# Non-interacrtive zsh configuration.
+#
+
+# Set up XDG base dirs
+export XDG_CONFIG_HOME=$HOME/.config
+export XDG_CACHE_HOME=$HOME/.cache
+export XDG_DATA_HOME=$HOME/.local/share
+export XDG_STATE_HOME=$HOME/.local/state
+
+# Environment variables
+export EDITOR='emacsclient -q'
+export VISUAL='emacsclient -q'
+export LANG='en_US.UTF-8'
+
+# less
+export LESS='-g -i -M -R -S -w -z-4 --mouse'
+
+# path
+typeset -g path
+path=(
+  $HOME/{,s}bin(N)
+  $HOME/.local/{,s}bin(N)
+  /opt/homebrew/{,s}bin(N)
+  /usr/local/{,s}bin(N)
+  $path
+)
+
+# Local settings
+[[ ! -f ${ZDOTDIR}/.zprofile.local ]] || source ${ZDOTDIR}/.zprofile.local

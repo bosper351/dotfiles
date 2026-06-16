@@ -1,0 +1,9 @@
+brew "ffmpeg"
+brew "imagemagick"
+
+cask "calibre"
+cask "firefox"
+cask "keepassxc"
+cask "libreoffice"
+cask "thunderbird"
+cask "transmission"

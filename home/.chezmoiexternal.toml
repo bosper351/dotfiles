@@ -1,0 +1,21 @@
+# SwiftBar Plugins
+["Library/Application Support/SwiftBar/Plugins/brew-updates.12h.rb"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/matryer/xbar-plugins/refs/heads/main/Dev/Homebrew/brew-updates.1h.rb"
+    executable = true
+    refreshPeriod = "168h"
+
+# ZSH Plugins
+[".local/share/zsh-plugins/zephyr"]
+    type = "archive"
+    url = "https://github.com/mattmc3/zephyr/archive/refs/heads/main.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+
+[".local/share/zsh-plugins/history-search-multi-word"]
+    type = "archive"
+    url = "https://github.com/zdharma-continuum/history-search-multi-word/archive/refs/heads/main.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"

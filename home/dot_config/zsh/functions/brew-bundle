@@ -1,0 +1,5 @@
+#!/bin/zsh
+#
+# run homebrew bundle using all ~/.config/homebrew/*.brewfile(s)
+#
+brew bundle --file=<(cat ~/.config/homebrew/*.brewfile) $*
