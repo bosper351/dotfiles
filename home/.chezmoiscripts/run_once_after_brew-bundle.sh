@@ -1,5 +1,5 @@
-#!/bin/bash
+#!/bin/zsh
 
 set -eufo pipefail
 
-brew-bundle
+brew bundle --file=<(cat ~/.config/homebrew/*.brewfile)
