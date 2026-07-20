@@ -49,6 +49,6 @@ brew "zsh-completions"
 
 # Emacs
 tap "d12frosted/emacs-plus", trusted: true
-cask "emacs-plus-app"
+brew "emacs-plus@31", postinstall: "/bin/zsh -c 'cp -r $HOMEBREW_PREFIX/opt/emacs-plus@31/*.app /Applications/'"
 brew "dtach"
 cask "font-symbols-only-nerd-font"
