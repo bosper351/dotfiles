@@ -549,17 +549,6 @@ If the new path's directories does not exist, create them."
   :config
   (add-to-list 'project-switch-commands '(ghostel-project "Terminal" "t")))
 
-(use-package eat
-  :ensure t
-  :custom
-  (eat-term-name "xterm-256color") ; https://codeberg.org/akib/emacs-eat/issues/119
-  (eat-enable-yank-to-terminal t)
-  (eat-kill-buffer-on-exit t)
-  ; Do not inhibit modifiers+arrows
-  (eat-semi-char-non-bound-keys
-   '([?\C-x] [?\C-\\] [?\C-q] [?\C-g] [?\C-h] [?\e ?\C-c] [?\C-u]
-     [?\e ?x] [?\e ?:] [?\e ?!] [?\e ?&])))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;;   LLMs

@@ -1,4 +1,5 @@
 tap "hashicorp/tap", trusted: true
+tap "starkandwayne/cf", trusted: true
 
 brew "awscli"
 brew "box/box/boxconnect"
@@ -15,3 +16,4 @@ cask "1password"
 cask "betterdisplay"
 cask "box-tools"
 cask "claude-code"
+
